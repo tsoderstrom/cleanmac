@@ -64,6 +64,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "- Xcode derived data and archives"
     echo "- Node.js cache (npm, yarn)"
     echo "- Docker unused images and containers"
+    echo "- ._* files on non-APFS volumes"
     echo "- System memory cache and swap"
     
     if command -v brew >/dev/null 2>&1; then
@@ -154,6 +155,25 @@ if command -v docker >/dev/null 2>&1; then
         fi
     fi
 fi
+
+# Clean ._* files on non-APFS volumes
+echo "Cleaning ._* files on non-APFS volumes..."
+for volume in /Volumes/*; do
+    if [ -d "$volume" ] && [ ! -L "$volume" ]; then
+        # Get filesystem type
+        if fs_type=$(diskutil info "$volume" 2>/dev/null | grep "Type (Bundle):" | awk '{print $3}'); then
+            # If not APFS and not empty
+            if [[ "$fs_type" != "apfs" && -n "$fs_type" ]]; then
+                if [ "$DRY_RUN" = true ]; then
+                    echo "[DRY RUN] Would run: sudo dot_clean -m \"$volume\" ($fs_type)"
+                else
+                    echo "Running dot_clean on $volume ($fs_type)..."
+                    sudo dot_clean -m "$volume" || echo "Error running dot_clean on $volume"
+                fi
+            fi
+        fi
+    fi
+done
 
 # System memory cleanup
 echo "Purging system memory cache..."
